@@ -43,4 +43,46 @@ Ensure you have Python installed on your system.
 1. **Clone the repository:**
    ```bash
    git clone [https://github.com/Mafhh-Technologies/Seaon.app.git](https://github.com/Mafhh-Technologies/Seaon.app.git)
-   cd Seaon.app
+   cd Seaon.app'''
+2. **Install Dependencies:
+   ```bash
+   pip install -r requirements.text```
+
+3. ** Initialize the Database (if required):
+   ```bash
+   python database.py```
+
+4. Run the Application:
+  * Option A (Windows Batch File):
+    Double-click or run ```start.bat``` in your terminal:
+    ```DOS
+    start.bat```
+  * Option B(Python directly):
+    ```Bash
+    python app.py```
+
+## 📂 Project Structure
+```Plaintext
+Seaon.app/
+│
+├── static/          # Static assets (CSS, JavaScript, Images)
+├── templates/       # HTML template files for rendering views
+├── API.txt          # API documentation & endpoints
+├── README.md        # Repository documentation
+├── README.txt       # Legacy/plain text documentation
+├── START_HERE.txt   # Quickstart instructions for setup
+├── app.py           # Main application entry point
+├── database.db      # SQLite database file
+├── database.py      # Database handlers and Python script
+├── database.sql     # SQL initialization schema
+├── requirements.txt # Dependencies list
+└── start.bat        # Windows launch script
+```
+
+📑 API Reference
+
+For detailed endpoint documentation and usage instructions, please refer to the API.txt file included in the repository.
+<p>------------------------------------------------------------------------------------------</p>
+<h2>Highlights of this design:</h2>
+* HTML Center Header: Uses clean HTML elements for en eye-catching header, bannner image, and nab links.
+* Custom Project Layout 
