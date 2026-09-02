@@ -1,0 +1,38 @@
+START HERE - SEON ERP
+=====================
+
+If you are seeing "Server request failed", do this exactly:
+
+1. Open this folder in VS Code.
+2. Open Terminal.
+3. Run:
+       py -m venv .venv
+       .venv\Scripts\activate
+       pip install -r requirements.txt
+4. Run:
+       python app.py
+5. Keep that terminal open.
+6. Open Chrome/Edge and go to:
+       http://127.0.0.1:5000
+
+DO NOT open:
+       templates/index.html
+by double-clicking it.
+
+TEST:
+Open:
+       http://127.0.0.1:5000/api/health
+
+If it shows database connected, the backend is working.
+
+Then:
+Inventory -> + Add Product -> fill fields -> Add Product.
+
+The product is inserted into database.db.
+Refresh the page. The product remains because it is stored in SQLite.
+
+If Python says Flask is missing:
+       pip install -r requirements.txt
+
+If port 5000 is busy:
+stop the other Flask/Python process, then run python app.py again.
