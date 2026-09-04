@@ -1,0 +1,44 @@
+SEON ERP API - INVENTORY
+========================
+
+GET /api/health
+Returns server/database status.
+
+GET /api/products
+Returns all inventory products.
+
+POST /api/products
+Adds a product.
+JSON example:
+{
+  "itemName": "Double-Sided Foam Tape (DSFT-100)",
+  "category": "Finished Product",
+  "type": "Finished Product",
+  "availableQuantity": 100,
+  "unit": "pcs",
+  "minimumStock": 20,
+  "location": "Hyderabad",
+  "thickness": "1.0",
+  "sizeDescription": "1000 mm",
+  "color": "White"
+}
+
+PUT /api/products/<id>
+Edits a product.
+
+PATCH /api/products/<id>/stock
+Adjusts only the current quantity and creates stock history.
+JSON:
+{
+  "availableQuantity": 250,
+  "note": "Manual stock adjustment"
+}
+
+GET /api/products/<id>/movements
+Returns stock adjustment history.
+
+DELETE /api/products/<id>
+Deletes the product and its stock history.
+
+GET /api/stats
+Returns total, low-stock and OK counts.
