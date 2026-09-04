@@ -1,6 +1,6 @@
 <div align="center">
 
-  <h1>🌊 Seaon.app (v1)</h1>
+  <h1>🌊 Seaon.app (v2)</h1>
   <p><b>Version 1 of Seaon Tapes</b></p>
 
   <p>
