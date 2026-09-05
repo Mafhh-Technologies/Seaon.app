@@ -1,1 +1,38 @@
+name: Backup to Personal GitHub
 
+on:
+  push:
+    branches:
+      - '**'
+    tags:
+      - '**'
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Push branches and tags to personal repository
+        env:
+          PERSONAL_REPO_TOKEN: ${{ secrets.PERSONAL_REPO_TOKEN }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git remote add personal "https://x-access-token:${PERSONAL_REPO_TOKEN}@github.com/shakerofficial7-design/SEAON_ERP_Dashboard.git"
+
+          git fetch origin --prune --tags
+
+          for branch in $(git for-each-ref --format='%(refname:strip=3)' refs/remotes/origin/ | grep -v '^HEAD$'); do
+            git push personal "refs/remotes/origin/$branch:refs/heads/$branch"
+          done
+
+          for tag in $(git for-each-ref --format='%(refname:strip=2)' refs/tags/); do
+            git push personal "refs/tags/$tag:refs/tags/$tag"
+          done
