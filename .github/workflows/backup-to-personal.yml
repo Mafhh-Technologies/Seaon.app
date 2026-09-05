@@ -29,6 +29,10 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
+          echo "Removing GitHub Actions default authentication..."
+          git config --local --unset-all http.https://github.com/.extraheader || true
+
+          echo "Adding personal repository..."
           git remote add personal "https://x-access-token:${PERSONAL_REPO_TOKEN}@github.com/shakerofficial7-design/SEAON_ERP_Dashboard.git"
 
           echo "Fetching all branches and tags from work repository..."
