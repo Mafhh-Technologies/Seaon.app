@@ -19,23 +19,28 @@ jobs:
         with:
           fetch-depth: 0
           fetch-tags: true
+          persist-credentials: false
 
       - name: Backup branches and tags
         env:
           PERSONAL_REPO_TOKEN: ${{ secrets.PERSONAL_REPO_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -e
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          echo "Removing GitHub Actions default authentication..."
-          git config --local --unset-all http.https://github.com/.extraheader || true
+          echo "Configuring work repository authentication..."
 
-          echo "Adding personal repository..."
+          git remote set-url origin "https://x-access-token:${GITHUB_TOKEN}@github.com/Mafhh-Technologies/Seaon.app.git"
+
+          echo "Configuring personal repository..."
+
           git remote add personal "https://x-access-token:${PERSONAL_REPO_TOKEN}@github.com/shakerofficial7-design/SEAON_ERP_Dashboard.git"
 
           echo "Fetching all branches and tags from work repository..."
+
           git fetch origin '+refs/heads/*:refs/remotes/origin/*' --tags
 
           echo "Backing up branches..."
