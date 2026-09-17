@@ -1,50 +1,56 @@
-from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel, Field
+"""
+BOM routes — list / create / delete component mappings.
+"""
+from typing import List
+
+from fastapi import APIRouter, Depends
+from sqlalchemy.orm import Session
+
+from app.api.routes.auth import get_current_active_user
+from app.core.database import get_db
+from app.models.user import User
+from app.schemas.inventory import BOMEntryCreate, BOMEntryOut
+from app.services.bom_service import BOMService
+
+router = APIRouter()
 
 
-router = APIRouter(prefix="/bom", tags=["bom"])
+@router.get("", response_model=List[BOMEntryOut])
+def list_bom(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    return BOMService.list_all(db)
 
 
-class BOMItem(BaseModel):
-	id: int
-	product: str
-	component: str
-	quantity: float = Field(gt=0)
-	unit: str
+@router.get("/product/{product_id}", response_model=List[BOMEntryOut])
+def list_bom_for_product(
+    product_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    return BOMService.list_by_product(db, product_id)
 
 
-class BOMCreate(BaseModel):
-	product: str = Field(min_length=1)
-	component: str = Field(min_length=1)
-	quantity: float = Field(gt=0)
-	unit: str = Field(min_length=1)
+@router.post("", response_model=BOMEntryOut, status_code=201)
+def create_bom(
+    payload: BOMEntryCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    return BOMService.create(
+        db,
+        product_id=payload.product_id,
+        component_id=payload.component_id,
+        quantity=payload.quantity,
+        unit=payload.unit,
+    )
 
 
-_bom = [
-	BOMItem(id=1, product="Widget A", component="Raw Material X", quantity=2, unit="kg"),
-	BOMItem(id=2, product="Widget A", component="Component A", quantity=4, unit="pcs"),
-	BOMItem(id=3, product="Widget B", component="Raw Material Y", quantity=3, unit="kg"),
-	BOMItem(id=4, product="Widget B", component="Component B", quantity=2, unit="pcs"),
-	BOMItem(id=5, product="Widget C", component="Raw Material X", quantity=1, unit="kg"),
-	BOMItem(id=6, product="Widget C", component="Component A", quantity=6, unit="pcs"),
-]
-
-
-@router.get("", response_model=list[BOMItem])
-async def list_bom() -> list[BOMItem]:
-	return _bom
-
-
-@router.get("/product/{product_id}", response_model=list[BOMItem])
-async def get_product_bom(product_id: str) -> list[BOMItem]:
-	items = [item for item in _bom if item.product.lower() == product_id.lower()]
-	if not items:
-		raise HTTPException(status_code=404, detail="BOM not found for product")
-	return items
-
-
-@router.post("", response_model=BOMItem, status_code=201)
-async def create_bom_item(payload: BOMCreate) -> BOMItem:
-	item = BOMItem(id=max((entry.id for entry in _bom), default=0) + 1, **payload.model_dump())
-	_bom.append(item)
-	return item
+@router.delete("/{entry_id}", status_code=204)
+def delete_bom(
+    entry_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    BOMService.delete(db, entry_id)

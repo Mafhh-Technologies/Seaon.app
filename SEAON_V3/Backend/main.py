@@ -1,60 +1,79 @@
-"""Application entry point for the SEAON backend."""
-
-from datetime import datetime, timezone
-from typing import Any
+"""
+Main FastAPI application entry point.
+Sets up middleware, routers, exception handlers, and lifecycle events.
+"""
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.trustedhost import TrustedHostMiddleware
 
-from app.api.routes.auth import router as auth_router
-from app.api.routes.bom import router as bom_router
-from app.api.routes.inventory import router as inventory_router
-from app.api.routes.orders import router as orders_router
+from app.api.routes import production
+from app.api.routes import auth, orders, inventory, bom
+from app.core.config import settings
 from app.core.database import init_db
+from app.core.exceptions import register_exception_handlers
+from app.core.logging import setup_logging
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Application lifespan: startup and shutdown events."""
+    setup_logging()
+    init_db()
+    yield
+
 
 app = FastAPI(
-	title="SEAON API",
-	description="Backend API for SEAON.",
-	version="1.0.0",
+    title="SEAON Manufacturing Dashboard API",
+    description="Backend API for inventory, production, orders, and BOM management.",
+    version="1.0.0",
+    lifespan=lifespan,
+    docs_url="/api/docs",
+    redoc_url="/api/redoc",
+    openapi_url="/api/openapi.json",
 )
 
-# Keep the API usable from local development frontends while allowing the
-# deployment environment to provide stricter CORS rules later.
+# ── Middleware ──────────────────────────────────────────────────────────────
 app.add_middleware(
-	CORSMiddleware,
-	allow_origins=["*"],
-	allow_credentials=False,
-	allow_methods=["*"],
-	allow_headers=["*"],
+    CORSMiddleware,
+    allow_origins=settings.CORS_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
-app.include_router(auth_router, prefix="/api")
-app.include_router(bom_router, prefix="/api")
-app.include_router(inventory_router, prefix="/api")
-app.include_router(orders_router, prefix="/api")
+app.add_middleware(
+    TrustedHostMiddleware,
+    allowed_hosts=settings.ALLOWED_HOSTS,
+)
 
+# ── Exception handlers ──────────────────────────────────────────────────────
+register_exception_handlers(app)
 
-@app.on_event("startup")
-async def startup() -> None:
-	init_db()
+# ── Routers ────────────────────────────────────────────────────────────────
+app.include_router(auth.router,
+                   prefix="/api/auth",
+                   tags=["Authentication"]
+                   )
+app.include_router(orders.router,
+                   prefix="/api/orders",
+                   tags=["Orders"]
+                   )
+app.include_router(inventory.router,
+                   prefix="/api/inventory",
+                   tags=["Inventory"]
+                   )
+app.include_router(bom.router,
+                   prefix="/api/bom",
+                   tags=["Bill of Materials"]
+                   )
+app.include_router(production.router,
+                   prefix="/api/production",
+                   tags=["Production"]
+                   )
 
-
-@app.get("/", tags=["system"])
-async def root() -> dict[str, str]:
-	"""Return basic API metadata."""
-	return {"name": "SEAON API", "status": "ok"}
-
-
-@app.get("/health", tags=["system"])
-async def health_check() -> dict[str, Any]:
-	"""Provide a lightweight health check for monitoring and deployments."""
-	return {
-		"status": "healthy",
-		"timestamp": datetime.now(timezone.utc).isoformat(),
-	}
-
-
-if __name__ == "__main__":
-	import uvicorn
-
-	uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+@app.get("/api/health", tags=["Health"])
+def health_check():
+    """Health check endpoint for Docker / load balancers."""
+    return {"status": "healthy", "version": app.version}

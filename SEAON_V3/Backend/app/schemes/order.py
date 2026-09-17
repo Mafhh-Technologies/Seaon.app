@@ -1,27 +1,53 @@
-from datetime import date
+"""Order schemas."""
+from datetime import datetime
+from typing import List, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
 
+class OrderItemCreate(BaseModel):
+    product_id: int
+    quantity: float = Field(..., gt=0)
+
+
 class OrderCreate(BaseModel):
-	customer: str = Field(min_length=1, max_length=160)
-	product: str = Field(min_length=1, max_length=120)
-	quantity: int = Field(gt=0)
-	status: str = "pending"
-	notes: str | None = None
+    customer_name: str = Field(..., min_length=2, max_length=200)
+    items: List[OrderItemCreate] = Field(..., min_length=1)
+    priority: str = "medium"
+    notes: Optional[str] = None
 
 
-class OrderStatusUpdate(BaseModel):
-	status: str = Field(pattern="^(pending|in-progress|completed|cancelled)$")
+class OrderItemOut(BaseModel):
+    id: int
+    product_id: int
+    product_name: Optional[str] = None
+    quantity: float
+    unit_price: Optional[float] = None
+
+    model_config = ConfigDict(from_attributes=True)
 
 
-class OrderRead(BaseModel):
-	model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+class OrderOut(BaseModel):
+    id: int
+    customer_name: str
+    status: str
+    priority: str
+    notes: Optional[str]
+    created_at: datetime
+    items: List[OrderItemOut] = []
 
-	id: int
-	customer: str
-	product: str
-	quantity: int
-	status: str
-	date: date = Field(validation_alias="order_date", serialization_alias="date")
-	notes: str | None = None
+    model_config = ConfigDict(from_attributes=True)
+
+
+class MaterialAvailability(BaseModel):
+    product_id: int
+    product_name: str
+    required: float
+    available: float
+    sufficient: bool
+    shortage: float = 0
+
+
+class OrderAvailabilityResponse(BaseModel):
+    order_ready: bool
+    materials: List[MaterialAvailability]

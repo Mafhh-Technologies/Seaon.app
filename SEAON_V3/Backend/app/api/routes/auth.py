@@ -1,67 +1,70 @@
-from datetime import datetime, timezone
-from secrets import token_urlsafe
+"""
+Auth routes — login, register, current user.
+"""
+from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from sqlalchemy.orm import Session
 
-from fastapi import APIRouter, Header, HTTPException, status
-from pydantic import BaseModel, EmailStr, Field
+from app.core.database import get_db
+from app.core.security import decode_access_token
+from app.models.user import User
+from app.schemas.user import TokenResponse, UserCreate, UserLogin, UserOut
+from app.services.auth_service import AuthService
 
-
-router = APIRouter(prefix="/auth", tags=["auth"])
-
-
-class LoginRequest(BaseModel):
-	email: EmailStr
-	password: str = Field(min_length=6)
-
-
-class User(BaseModel):
-	id: int
-	name: str
-	email: EmailStr
-	role: str = "admin"
+router = APIRouter()
+bearer_scheme = HTTPBearer(auto_error=False)
 
 
-class LoginResponse(BaseModel):
-	token: str
-	user: User
+# ── Dependencies ───────────────────────────────────────────────────────────
+def get_current_user(
+    credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
+    db: Session = Depends(get_db),
+) -> User:
+    if not credentials:
+        raise HTTPException(status_code=401, detail="Missing authorization header")
+
+    payload = decode_access_token(credentials.credentials)
+    if not payload:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+    user_id = payload.get("sub")
+    user = db.query(User).filter(User.id == int(user_id)).first()
+    if not user:
+        raise HTTPException(status_code=401, detail="User no longer exists")
+    return user
 
 
-_users = {
-	"admin@seaon.com": User(
-		id=1,
-		name="Administrator",
-		email="admin@seaon.com",
-	)
-}
-_tokens: dict[str, User] = {}
+def get_current_active_user(current_user: User = Depends(get_current_user)) -> User:
+    """Same as get_current_user but semantic alias for permission checks."""
+    return current_user
 
 
-def _current_user(authorization: str | None) -> User:
-	if not authorization or not authorization.startswith("Bearer "):
-		raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
-	user = _tokens.get(authorization.removeprefix("Bearer ").strip())
-	if user is None:
-		raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token")
-	return user
+# ── Endpoints ──────────────────────────────────────────────────────────────
+@router.post("/login", response_model=TokenResponse)
+def login(payload: UserLogin, db: Session = Depends(get_db)):
+    user = AuthService.authenticate(db, payload.email, payload.password)
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid email or password")
+
+    token = AuthService.issue_token(user)
+    return TokenResponse(access_token=token, user=UserOut.model_validate(user))
 
 
-@router.post("/login", response_model=LoginResponse)
-async def login(payload: LoginRequest) -> LoginResponse:
-	user = _users.get(str(payload.email).lower())
-	if user is None:
-		user = User(id=len(_users) + 1, name=str(payload.email).split("@")[0].title(), email=payload.email)
-		_users[str(payload.email).lower()] = user
-	token = token_urlsafe(32)
-	_tokens[token] = user
-	return LoginResponse(token=token, user=user)
+@router.post("/register", response_model=UserOut, status_code=status.HTTP_201_CREATED)
+def register(payload: UserCreate, db: Session = Depends(get_db)):
+    try:
+        user = AuthService.create_user(
+            db,
+            name=payload.name,
+            email=payload.email,
+            password=payload.password,
+            role=payload.role,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+    return UserOut.model_validate(user)
 
 
-@router.get("/me", response_model=User)
-async def me(authorization: str | None = Header(default=None)) -> User:
-	return _current_user(authorization)
-
-
-@router.post("/logout")
-async def logout(authorization: str | None = Header(default=None)) -> dict[str, str]:
-	if authorization and authorization.startswith("Bearer "):
-		_tokens.pop(authorization.removeprefix("Bearer ").strip(), None)
-	return {"message": "Logged out successfully", "timestamp": datetime.now(timezone.utc).isoformat()}
+@router.get("/me", response_model=UserOut)
+def me(current_user: User = Depends(get_current_active_user)):
+    return UserOut.model_validate(current_user)

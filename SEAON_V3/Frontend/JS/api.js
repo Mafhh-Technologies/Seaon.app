@@ -5,7 +5,8 @@
 
 const API = {
     // Base URL - change this to your actual backend
-    baseURL: 'http://localhost:3000/api',
+    // baseURL: 'http://localhost:3000/api',
+    baseURL: 'http://localhost:8000/api',
     
     // Default headers
     headers: {

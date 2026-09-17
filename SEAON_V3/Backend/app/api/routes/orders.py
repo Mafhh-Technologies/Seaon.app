@@ -1,75 +1,81 @@
-from datetime import date
+"""
+Order routes — CRUD + smart availability check.
+"""
+from typing import List
 
-from fastapi import APIRouter, HTTPException, Query
-from pydantic import BaseModel, Field
+from fastapi import APIRouter, Depends, Query
+from sqlalchemy.orm import Session
 
+from app.api.routes.auth import get_current_active_user
+from app.core.database import get_db
+from app.models.user import User
+from app.schemas.order import OrderAvailabilityResponse, OrderCreate, OrderOut
+from app.services.order_service import OrderService
+from app.services.smart_order_service import SmartOrderService
 
-router = APIRouter(prefix="/orders", tags=["orders"])
-
-
-class Order(BaseModel):
-	id: int
-	customer: str
-	product: str
-	quantity: int = Field(gt=0)
-	status: str = "pending"
-	date: date
-	notes: str | None = None
-
-
-class OrderCreate(BaseModel):
-	customer: str = Field(min_length=1)
-	product: str = Field(min_length=1)
-	quantity: int = Field(gt=0)
-	status: str = "pending"
-	notes: str | None = None
+router = APIRouter()
 
 
-class StatusUpdate(BaseModel):
-	status: str = Field(pattern="^(pending|in-progress|completed|cancelled)$")
+@router.get("", response_model=List[OrderOut])
+def list_orders(
+    status: str = Query("all"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    return OrderService.list_orders(db, status_filter=status)
 
 
-_orders = [
-	Order(id=1, customer="Acme Corp", product="Widget A", quantity=50, status="pending", date=date(2026, 9, 1)),
-	Order(id=2, customer="TechStart Inc", product="Widget B", quantity=30, status="completed", date=date(2026, 8, 28)),
-	Order(id=3, customer="GreenLeaf Ltd", product="Widget C", quantity=100, status="in-progress", date=date(2026, 9, 3)),
-]
+@router.get("/{order_id}", response_model=OrderOut)
+def get_order(
+    order_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    return OrderService.get_order(db, order_id)
 
 
-def _find_order(order_id: int) -> Order:
-	for order in _orders:
-		if order.id == order_id:
-			return order
-	raise HTTPException(status_code=404, detail="Order not found")
+@router.get("/check-availability/{product_id}", response_model=OrderAvailabilityResponse)
+def check_availability(
+    product_id: int,
+    quantity: float = Query(..., gt=0),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """Frontend calls this as the user types quantity — live material check."""
+    return SmartOrderService.check_availability(db, product_id, quantity)
 
 
-@router.get("", response_model=list[Order])
-async def list_orders(page: int = Query(default=1, ge=1), limit: int = Query(default=20, ge=1, le=100)) -> list[Order]:
-	start = (page - 1) * limit
-	return _orders[start:start + limit]
+@router.post("", response_model=OrderOut, status_code=201)
+def create_order(
+    payload: OrderCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    items = [{"product_id": i.product_id, "quantity": i.quantity} for i in payload.items]
+    return OrderService.create_order(
+        db,
+        customer_name=payload.customer_name,
+        items=items,
+        priority=payload.priority,
+        notes=payload.notes,
+        user_id=current_user.id,
+    )
 
 
-@router.get("/{order_id}", response_model=Order)
-async def get_order(order_id: int) -> Order:
-	return _find_order(order_id)
+@router.patch("/{order_id}/status", response_model=OrderOut)
+def update_status(
+    order_id: int,
+    new_status: str = Query(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    return OrderService.update_status(db, order_id, new_status)
 
 
-@router.post("", response_model=Order, status_code=201)
-async def create_order(payload: OrderCreate) -> Order:
-	order = Order(id=max((entry.id for entry in _orders), default=0) + 1, date=date.today(), **payload.model_dump())
-	_orders.insert(0, order)
-	return order
-
-
-@router.patch("/{order_id}/status", response_model=Order)
-async def update_order_status(order_id: int, payload: StatusUpdate) -> Order:
-	order = _find_order(order_id)
-	order.status = payload.status
-	return order
-
-
-@router.delete("/{order_id}")
-async def delete_order(order_id: int) -> dict[str, str]:
-	order = _find_order(order_id)
-	_orders.remove(order)
-	return {"message": "Order deleted"}
+@router.delete("/{order_id}", status_code=204)
+def delete_order(
+    order_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    OrderService.delete_order(db, order_id)

@@ -1,29 +1,44 @@
-from collections.abc import Generator
-
+"""
+SQLAlchemy engine, session factory, and base model.
+"""
 from sqlalchemy import create_engine
-from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
+from sqlalchemy.orm import declarative_base, sessionmaker
 
 from app.core.config import settings
 
+# SQLite needs a special flag for multi-threaded FastAPI
+connect_args = {"check_same_thread": False} if settings.DATABASE_URL.startswith("sqlite") else {}
 
-class Base(DeclarativeBase):
-	pass
+engine = create_engine(
+    settings.DATABASE_URL,
+    connect_args=connect_args,
+    echo=settings.DEBUG,
+    pool_pre_ping=True,
+)
+
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+Base = declarative_base()
 
 
-connect_args = {"check_same_thread": False} if settings.database_url.startswith("sqlite") else {}
-engine = create_engine(settings.database_url, connect_args=connect_args, future=True)
-SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, expire_on_commit=False)
-
-
-def get_db() -> Generator[Session, None, None]:
-	db = SessionLocal()
-	try:
-		yield db
-	finally:
-		db.close()
+def get_db():
+    """
+    FastAPI dependency: yields a database session and guarantees close.
+    Usage: def endpoint(db: Session = Depends(get_db)): ...
+    """
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
 
 
 def init_db() -> None:
-	from app.models import inventory, order, product, production, user  # noqa: F401
+    """Create all tables and seed default admin user (called on startup)."""
+    # Import models so SQLAlchemy knows about them before create_all
+    from app import models  # noqa: F401
 
-	Base.metadata.create_all(bind=engine)
+    Base.metadata.create_all(bind=engine)
+
+    # Seed default admin user
+    from app.services.auth_service import AuthService
+    AuthService.seed_default_admin()

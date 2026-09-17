@@ -1,40 +1,62 @@
-from sqlalchemy import select
+"""
+BOM service — define and query which components each product needs.
+"""
+from typing import List
+
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import ConflictError, NotFoundError
-from app.models.product import BOMItem, Product
-from app.schemes.product import BOMCreate
+from app.models.product import Product
+from app.models.bom import BOMEntry  # defined below in a tiny module
 
 
-def list_bom(db: Session) -> list[BOMItem]:
-	return list(db.scalars(select(BOMItem).order_by(BOMItem.product_id, BOMItem.id)))
+class BOMService:
+    @staticmethod
+    def list_all(db: Session) -> List[BOMEntry]:
+        return db.query(BOMEntry).all()
 
+    @staticmethod
+    def list_by_product(db: Session, product_id: int) -> List[BOMEntry]:
+        return db.query(BOMEntry).filter(BOMEntry.product_id == product_id).all()
 
-def get_product_bom(db: Session, product_name: str) -> list[BOMItem]:
-	product = db.scalar(select(Product).where(Product.name == product_name))
-	if product is None:
-		raise NotFoundError("Product not found")
-	return list(db.scalars(select(BOMItem).where(BOMItem.product_id == product.id).order_by(BOMItem.id)))
+    @staticmethod
+    def create(db: Session, product_id: int, component_id: int, quantity: float, unit: str) -> BOMEntry:
+        if product_id == component_id:
+            raise ConflictError("A product cannot be its own component.")
 
+        # Ensure both exist
+        if not db.query(Product).filter(Product.id == product_id).first():
+            raise NotFoundError("Product")
+        if not db.query(Product).filter(Product.id == component_id).first():
+            raise NotFoundError("Component")
 
-def create_bom_item(db: Session, payload: BOMCreate) -> BOMItem:
-	product = db.scalar(select(Product).where(Product.name == payload.product))
-	if product is None:
-		product = Product(name=payload.product, sku=payload.product.upper().replace(" ", "-"), unit="pcs")
-		db.add(product)
-		db.flush()
-	if db.scalar(select(BOMItem).where(BOMItem.product_id == product.id, BOMItem.component == payload.component)):
-		raise ConflictError("BOM component already exists for this product")
-	item = BOMItem(product_id=product.id, component=payload.component, quantity=payload.quantity, unit=payload.unit)
-	db.add(item)
-	db.commit()
-	db.refresh(item)
-	return item
+        existing = (
+            db.query(BOMEntry)
+            .filter(BOMEntry.product_id == product_id, BOMEntry.component_id == component_id)
+            .first()
+        )
+        if existing:
+            existing.quantity = quantity
+            existing.unit = unit
+            db.commit()
+            db.refresh(existing)
+            return existing
 
+        entry = BOMEntry(
+            product_id=product_id,
+            component_id=component_id,
+            quantity=quantity,
+            unit=unit,
+        )
+        db.add(entry)
+        db.commit()
+        db.refresh(entry)
+        return entry
 
-def delete_bom_item(db: Session, item_id: int) -> None:
-	item = db.get(BOMItem, item_id)
-	if item is None:
-		raise NotFoundError("BOM item not found")
-	db.delete(item)
-	db.commit()
+    @staticmethod
+    def delete(db: Session, entry_id: int) -> None:
+        entry = db.query(BOMEntry).filter(BOMEntry.id == entry_id).first()
+        if not entry:
+            raise NotFoundError("BOM entry")
+        db.delete(entry)
+        db.commit()
