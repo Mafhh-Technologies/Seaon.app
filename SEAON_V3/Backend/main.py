@@ -4,7 +4,7 @@ Sets up middleware, routers, exception handlers, and lifecycle events.
 """
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI #fastapi for creating the API application and defining routes, dependencies, and middleware.
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 
@@ -15,14 +15,12 @@ from app.core.database import init_db
 from app.core.exceptions import register_exception_handlers
 from app.core.logging import setup_logging
 
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan: startup and shutdown events."""
     setup_logging()
     init_db()
     yield
-
 
 app = FastAPI(
     title="SEAON Manufacturing Dashboard API",
