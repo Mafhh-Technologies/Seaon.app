@@ -1,0 +1,25 @@
+SEAON ERP - START HERE
+=======================
+
+WINDOWS USER:
+1. Double-click: run_seaon_windows.bat
+2. Wait for "Starting SEAON ERP..."
+3. Open: http://127.0.0.1:8000/app/login.html
+4. Login:
+   Email: admin@seaon.com
+   Password: Admin@123
+
+STOP THE APP:
+- Go to the black command window running SEAON.
+- Press Ctrl+C.
+
+ADMIN PANEL:
+http://127.0.0.1:8000/app/admin.html
+
+DATABASE:
+Backend/seaon.db
+
+IMPORTANT:
+Do not open the HTML file directly from Windows Explorer.
+Always start app.py / run_seaon_windows.bat first, because Django serves
+the frontend and API together.
