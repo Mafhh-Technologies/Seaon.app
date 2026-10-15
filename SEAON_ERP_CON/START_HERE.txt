@@ -1,6 +1,11 @@
 SEAON ERP - START HERE
 =======================
-
+Open COmmand terminalusing cmd command in address bar
+Commands to open software:
+- 1st: py -m venv .venv
+- 2nd: .venv\Scripts\activate
+- 3rd: python -m pip install -r requirements.txt
+- 4th: python app.py
 WINDOWS USER:
 1. Double-click: run_seaon_windows.bat
 2. Wait for "Starting SEAON ERP..."
